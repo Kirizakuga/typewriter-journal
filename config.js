@@ -2,6 +2,6 @@
 // The anon key is designed to be public: row-level security in supabase/migrations/
 // makes sure each signed-in user can only read and write their own journal.
 window.JOURNAL_CONFIG = {
-  supabaseUrl: '',
-  supabaseAnonKey: '',
+  supabaseUrl: 'https://duytszcqflwjswjodlyh.supabase.co',
+  supabaseAnonKey: 'sb_publishable_kJLTCLMJ9imRzW15Fr4Cbw_FPpo0067',
 };
