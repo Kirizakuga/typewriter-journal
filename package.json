@@ -1,0 +1,13 @@
+{
+  "name": "typewriter-journal",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Typewriter-style note journal with a project board, backed by SQLite.",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=22.5"
+  }
+}

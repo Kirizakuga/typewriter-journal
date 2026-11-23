@@ -1,0 +1,1088 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Typewriter Journal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ffffff;
+    --side: #f6f6f4;
+    --line-c: #e7e7e3;
+    --text: #1d1d1b;
+    --muted: #8b8b86;
+    --red: #e0362c;
+    --paper: #fbf8f1;
+    --type-size: 19px;
+    --line: 30px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: Inter, system-ui, sans-serif; font-size: 14px;
+    display: grid; grid-template-columns: 240px 1fr; height: 100vh;
+  }
+
+  /* sidebar */
+  aside { background: var(--bg); color: var(--text); transition: background-color .2s; border-right: 1px solid var(--line-c); display: flex; flex-direction: column; height: 100vh; z-index: 30; }
+  .side-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 10px; font-weight: 600; }
+  .btn { font: inherit; font-size: 13px; color: var(--text); background: transparent; border: 1px solid var(--line-c); padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+  .btn:hover { background: var(--hover); }
+  .btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .search { margin: 0 16px 10px; font: inherit; color: var(--text); background: var(--hover); border: 1px solid var(--line-c); padding: 7px 10px; border-radius: 6px; outline: none; }
+  .search::placeholder { color: var(--muted); }
+  .search:focus { border-color: var(--muted); }
+  .entries { list-style: none; margin: 0; padding: 0 8px 12px; overflow-y: auto; flex: 1; }
+  .entries li { padding: 9px 10px; border-radius: 6px; cursor: pointer; }
+  .entries li:hover { background: var(--hover); }
+  .entries li.active { background: var(--hover); box-shadow: 0 0 0 1px var(--line-c); }
+  .entries .title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .entries .meta { font-size: 12px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .empty { color: var(--muted); padding: 16px; text-align: center; }
+  .side-foot { padding: 12px 16px; border-top: 1px solid var(--line-c); }
+
+  /* top bar */
+  main { display: flex; flex-direction: column; min-width: 0; height: 100vh; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid var(--line-c); position: relative; z-index: 20; background: var(--bg); }
+  .group { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .title-input { font: inherit; font-weight: 600; font-size: 15px; border: 0; outline: none; background: transparent; width: 220px; color: var(--text); }
+  .title-input::placeholder { color: #bdbdb7; }
+  .toggle { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; user-select: none; color: var(--muted); }
+  .toggle input { accent-color: var(--text); }
+  .muted { color: var(--muted); font-size: 13px; }
+  .swatches { display: flex; gap: 6px; align-items: center; }
+  .sw { width: 20px; height: 20px; border-radius: 50%; border: 1px solid rgba(0,0,0,.15); cursor: pointer; padding: 0; }
+  .sw.on { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--text); }
+  .sw-custom { position: relative; overflow: hidden; background: conic-gradient(#f66, #fd6, #6d6, #6df, #96f, #f6c, #f66); }
+  .sw-custom input { position: absolute; inset: -6px; opacity: 0; cursor: pointer; }
+  .menu-btn { display: none; }
+  .auth { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 16px; background: var(--bg); }
+  .auth[hidden] { display: none; }
+  .auth-card { width: min(380px, 100%); display: flex; flex-direction: column; gap: 12px; }
+  .auth-card h1 { font-family: "Courier Prime", monospace; font-size: 24px; margin: 0; }
+  .auth-card p { margin: 0; color: var(--muted); line-height: 1.5; }
+  .auth-card input { font: inherit; padding: 10px 12px; border: 1px solid var(--line-c); border-radius: 6px; background: var(--hover); color: var(--text); outline: none; }
+  .auth-card input:focus { border-color: var(--muted); }
+  .auth-card .btn { padding: 10px; }
+  .auth-msg { min-height: 1.5em; color: var(--text) !important; }
+  .link { font: inherit; background: none; border: 0; color: var(--muted); text-decoration: underline; cursor: pointer; padding: 0; align-self: flex-start; }
+  .sync { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .sync::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #9a9a94; }
+  .sync[data-state="synced"]::before { background: #2f9e55; }
+  .sync[data-state="saving"]::before { background: #d9a520; }
+  .sync[data-state="offline"]::before, .sync[data-state="conflict"]::before { background: var(--red); }
+  body { --hover: rgba(0,0,0,.05); transition: background-color .2s; }
+  body.dark { --text: #f2f2ee; --muted: #a9a9a3; --line-c: rgba(255,255,255,.14); --hover: rgba(255,255,255,.08); }
+  body.dark .title-input::placeholder { color: #77776f; }
+  body.dark .toggle input { accent-color: #f2f2ee; }
+
+  /* stage */
+  .stage { position: relative; flex: 1; overflow: hidden; cursor: text; user-select: none; touch-action: none; }
+  .carriage { position: absolute; left: 0; top: 0; will-change: transform; transition: transform .06s linear; }
+  .carriage.returning { transition: transform .38s cubic-bezier(.2,.8,.25,1); }
+  .paperclip { position: absolute; left: -40px; right: -40px; top: 0; overflow: hidden; padding: 0 40px; }
+  .paper {
+    --text: #1d1d1b; --muted: #8b8b86;
+    position: relative; background: var(--paper); color: var(--text);
+    font-family: "Courier Prime", "Courier New", monospace; font-size: var(--type-size); line-height: var(--line);
+    box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 8px 30px rgba(0,0,0,.08);
+    transition: transform .18s ease-out, background-color .2s;
+    will-change: transform;
+  }
+  .head .h-title { font-weight: 700; }
+  .head .h-title.ph { opacity: .3; }
+  .head .h-date { font-size: .7em; color: var(--muted); }
+  .line { height: var(--line); white-space: nowrap; }
+  .c { display: inline-block; width: var(--cw); text-align: center; }
+  .c.sel { background: rgba(224,54,44,.15); }
+  .c.fresh { animation: appear .1s ease-out .09s both; }
+  @keyframes appear { from { opacity: 0; } to { opacity: 1; } }
+
+  .indicator { position: absolute; z-index: 4; width: 2px; background: var(--red); pointer-events: none; border-radius: 1px; animation: blink 1s steps(1) infinite; }
+  .stage.typing .indicator { animation: none; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .tearline { position: absolute; z-index: 5; height: 0; border-top: 2px dashed var(--red); opacity: 0; pointer-events: none; transition: opacity .15s; }
+  .tearline.show { opacity: .6; }
+  .tearline.ready { opacity: 1; border-top-style: solid; }
+  .torn { position: fixed; z-index: 40; pointer-events: none; overflow: hidden; }
+  .torn .paper { transition: none !important; box-shadow: none; }
+
+  #ta { position: absolute; z-index: 1; width: 2px; height: 2px; opacity: 0; border: 0; padding: 0; resize: none; font-size: 16px; }
+  .hint { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 7; font-size: 12px; color: var(--muted); background: #fff; border: 1px solid var(--line-c); padding: 4px 10px; border-radius: 20px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .hint.show { opacity: 1; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(16px); z-index: 50; background: #1d1d1b; color: #fff; box-shadow: 0 0 0 1px rgba(255,255,255,.15); padding: 8px 14px; border-radius: 8px; opacity: 0; transition: .2s; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateX(-50%); }
+
+  /* project tree */
+  .tree { padding: 0 8px 8px; max-height: 38vh; overflow-y: auto; border-bottom: 1px solid var(--line-c); }
+  .prow { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 6px; cursor: pointer; position: relative; }
+  .prow:hover { background: var(--hover); }
+  .prow.active { background: var(--hover); box-shadow: inset 2px 0 0 var(--red); font-weight: 600; }
+  .prow .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex: none; }
+  .prow.active .dot, .prow.path .dot { background: var(--red); }
+  .prow .pname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prow .pcount { font-size: 12px; color: var(--muted); }
+  .prow .pacts { display: none; gap: 2px; }
+  .prow:hover .pacts { display: flex; }
+  .prow:hover .pcount { display: none; }
+  .pacts button { font: inherit; font-size: 13px; width: 22px; height: 22px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; padding: 0; }
+  .pacts button:hover { background: var(--hover); color: var(--text); }
+  .notes-head { padding-top: 14px; }
+  .crumb { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+
+  /* write / board switch */
+  .seg { display: inline-flex; border: 1px solid var(--line-c); border-radius: 8px; overflow: hidden; }
+  .seg button { font: inherit; font-size: 13px; border: 0; background: transparent; padding: 6px 12px; color: var(--muted); cursor: pointer; }
+  .seg button.on { background: var(--hover); color: var(--text); font-weight: 600; }
+  .seg button.bump { animation: bump .4s; }
+  @keyframes bump { 40% { transform: scale(1.15); color: var(--red); } }
+  .board { display: none; position: relative; flex: 1; overflow: hidden; cursor: grab; touch-action: none; user-select: none;
+    --dot: rgba(0,0,0,.13);
+    background-image: radial-gradient(circle, var(--dot) 1px, transparent 1.3px); background-size: 24px 24px; }
+  body.dark .board { --dot: rgba(255,255,255,.12); }
+  body.board-mode .board { display: block; }
+  body.board-mode .stage, body.board-mode .write-only { display: none !important; }
+  .board.panning { cursor: grabbing; }
+  .world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  .world.anim { transition: transform .35s ease; }
+  .edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+  .edge { fill: none; stroke: var(--muted); stroke-width: 2; opacity: .45; }
+  .edge.hot { stroke: var(--red); opacity: .9; stroke-width: 2.5; }
+  .string { stroke: var(--muted); stroke-width: 1; opacity: .5; stroke-dasharray: 3 3; }
+  .string.hot { stroke: var(--red); opacity: .6; }
+  .pnode { position: absolute; transform: translate(-50%, -50%); padding: 8px 16px; border-radius: 20px; white-space: nowrap; cursor: pointer;
+    background: var(--text); color: var(--bg); font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,.15); transition: box-shadow .15s, transform .15s; z-index: 2; }
+  .pnode small { font-weight: 400; opacity: .6; margin-left: 6px; }
+  .pnode.current { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--red); }
+  .pnode.drop { transform: translate(-50%, -50%) scale(1.12); box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--red); }
+  .note { position: absolute; width: 170px; height: 124px; padding: 18px 12px 10px; overflow: hidden; cursor: grab; z-index: 3;
+    background: var(--paper); color: #1d1d1b; font-family: "Courier Prime", monospace; font-size: 12px; line-height: 1.35;
+    box-shadow: 0 1px 2px rgba(0,0,0,.12), 0 4px 14px rgba(0,0,0,.1); transition: box-shadow .15s; }
+  .note .pin { position: absolute; top: 6px; left: 50%; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--red); box-shadow: 0 1px 2px rgba(0,0,0,.4); }
+  .note .nt { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .note .nt.ph { opacity: .35; }
+  .note .nd { color: #8b8b86; font-size: 10px; margin-bottom: 4px; }
+  .note .ns { white-space: pre-wrap; word-break: break-word; overflow: hidden; max-height: 64px; color: #3a3a37; }
+  .note.active { outline: 2px solid var(--red); outline-offset: 2px; }
+  .note.dragging { box-shadow: 0 14px 30px rgba(0,0,0,.25); cursor: grabbing; z-index: 10; }
+  .board-ui { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; z-index: 20; pointer-events: none; }
+  .board-ui > * { pointer-events: auto; }
+  .board-ui .btn { background: var(--bg); }
+
+  @media (max-width: 900px) {
+    body { grid-template-columns: 1fr; }
+    aside { position: fixed; inset: 0 auto 0 0; width: 260px; transform: translateX(-100%); transition: transform .2s; }
+    body.drawer aside { transform: none; box-shadow: 0 0 0 100vmax rgba(0,0,0,.25); }
+    .menu-btn { display: inline-block; }
+    .title-input { width: 140px; }
+  }
+  @media (max-width: 600px) { :root { --type-size: 16px; --line: 26px; } }
+</style>
+</head>
+<body>
+  <aside>
+    <div class="side-head">Projects <button class="btn" id="addRootBtn" title="New top-level project">+</button></div>
+    <div class="tree" id="tree"></div>
+    <div class="side-head notes-head"><span id="notesHead">Notes</span> <button class="btn primary" id="newBtn" title="New sheet (Ctrl+Alt+N)">New</button></div>
+    <input class="search" id="search" type="search" placeholder="Search all notes">
+    <ul class="entries" id="list"></ul>
+    <div class="side-foot"><button class="btn" id="exportBtn">Export .txt</button></div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div class="group">
+        <button class="btn menu-btn" id="menuBtn">☰</button>
+        <div class="seg"><button id="writeTab" class="on">Write</button><button id="boardTab">Board</button></div>
+        <span class="crumb write-only" id="crumb"></span>
+        <input class="title-input write-only" id="title" placeholder="Untitled" maxlength="60" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="group">
+        <span class="muted">Paper</span><div class="swatches" id="swatches" title="Paper color"></div>
+        <span class="muted">Background</span><div class="swatches" id="bgSwatches" title="Background color"></div>
+        <label class="toggle write-only"><input type="checkbox" id="soundToggle" checked> Sound</label>
+        <label class="toggle write-only"><input type="checkbox" id="noBackspace"> No backspace</label>
+        <span class="muted write-only" id="count">0 words</span>
+        <span class="sync" id="sync" data-state="local">Browser only</span>
+        <button class="btn" id="accountBtn" hidden>Sign out</button>
+        <button class="btn write-only" id="deleteBtn">Delete</button>
+      </div>
+    </div>
+
+    <div class="stage" id="stage">
+      <div class="carriage" id="carriage">
+        <div class="paperclip" id="paperclip">
+          <div class="paper" id="paper">
+            <div class="head" id="head">
+              <div class="h-title" id="hTitle"></div>
+              <div class="h-date" id="hDate"></div>
+              <div style="height: var(--line)"></div>
+            </div>
+            <div id="lines"></div>
+          </div>
+        </div>
+      </div>
+      <div class="indicator" id="indicator"></div>
+      <div class="tearline" id="tearline"></div>
+      <div class="hint" id="hint">Rolled back · type to return</div>
+      <textarea id="ta" spellcheck="false" autocomplete="off" autocapitalize="sentences" aria-label="Journal text"></textarea>
+    </div>
+
+    <div class="board" id="board">
+      <div class="world" id="world"><svg class="edges" id="edges"></svg></div>
+      <div class="board-ui">
+        <button class="btn" id="centerBtn">Center</button>
+        <button class="btn" id="addChildBtn">+ Sub-project</button>
+        <span class="muted">Drag empty space to pan · scroll to zoom · drop a note on a project to move it · double-click a note to write</span>
+      </div>
+    </div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="auth" id="auth" hidden>
+    <form class="auth-card" id="authForm">
+      <h1>Typewriter Journal</h1>
+      <p>Sign in to keep your notes in the cloud. We'll email you a one-time link, no password needed.</p>
+      <input type="email" id="authEmail" required placeholder="you@example.com" autocomplete="email">
+      <button class="btn primary" type="submit">Email me a sign-in link</button>
+      <p class="auth-msg" id="authMsg"></p>
+      <button class="link" type="button" id="authSkip">Continue without syncing</button>
+    </form>
+  </div>
+
+<script src="config.js"></script>
+<script>
+(async () => {
+  const KEY = 'typewriter-journal-v1';
+  const COLS = 60, PAD_X = 56, PAD_T = 48, PAD_B = 10;
+  const SWATCHES = ['#fbf8f1', '#ffffff', '#f1f5fb', '#eef6ef', '#fdf0f0', '#fff6d8'];
+  const $ = id => document.getElementById(id);
+  const ta = $('ta'), titleEl = $('title'), stage = $('stage'), carriage = $('carriage'), paper = $('paper'),
+        clip = $('paperclip'), linesEl = $('lines'), indicator = $('indicator'), tearEl = $('tearline'),
+        listEl = $('list'), searchEl = $('search');
+
+  // ---------- storage ----------
+  // Where notes live, in order of preference:
+  //   1. Supabase (cloud) when config.js has a URL and key; needs an email sign-in.
+  //   2. server.js (SQLite) when the page is served by it, for local use.
+  //   3. This browser only.
+  // localStorage is always kept as an offline cache: unsynced edits stay "dirty" until the remote accepts them.
+  let entries = [], projects = [], currentProject = null;
+  let settings = { sound: true, noBackspace: false, paper: SWATCHES[0], bg: '#ffffff', mode: 'write', view: null };
+  const backend = await pickBackend();
+  const cacheKey = backend && backend.userId ? KEY + ':' + backend.userId : KEY;
+  let local = null;
+  try { local = JSON.parse(localStorage.getItem(cacheKey) || 'null'); } catch (e) {}
+  let serverRev = null, pushOnStart = false, conflictSaved = false;
+  const sameData = (a, b) => JSON.stringify([a.entries, a.projects]) === JSON.stringify([b.entries, b.projects]);
+  let source = local;
+  let startOffline = false;
+  if (backend) {
+    try {
+      const remote = await backend.load();
+      serverRev = remote.rev;
+      const remoteEmpty = !remote.projects.length && !remote.entries.length;
+      if (remoteEmpty) {
+        // first sync: upload what this browser already has (its own cache, or notes kept before signing in)
+        if (!local && cacheKey !== KEY) { try { source = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {} }
+        pushOnStart = !!source;
+      }
+      else if (local && local.dirty && local.baseRev === remote.rev) { pushOnStart = true; } // offline edits on top of latest
+      else {
+        if (local && local.dirty && !sameData(local, remote)) {                     // edits on an old copy: keep them aside
+          try { localStorage.setItem(cacheKey + '-conflict-' + Date.now(), JSON.stringify(local)); conflictSaved = true; } catch (e) {}
+        }
+        source = remote;
+      }
+    } catch (e) {
+      // remote not reachable: work from the browser cache and keep retrying
+      serverRev = local && typeof local.baseRev === 'number' ? local.baseRev : 0;
+      startOffline = true;
+    }
+  }
+  if (source) {
+    entries = source.entries || []; projects = source.projects || []; currentProject = source.currentProject;
+    settings = Object.assign(settings, source.settings || {});
+  }
+
+  function saveLocal(dirty) {
+    try { localStorage.setItem(cacheKey, JSON.stringify({ entries, settings, projects, currentProject, baseRev: serverRev, dirty })); } catch (e) {}
+  }
+  const snapshot = () => ({ entries, projects, currentProject, settings });
+  function setSync(state) {
+    const el = $('sync'); if (!el) return;
+    el.dataset.state = state;
+    el.textContent = { synced: backend ? 'Saved · ' + backend.label : 'Saved', saving: 'Saving…', offline: 'Offline · kept in browser', local: 'Browser only', conflict: 'Reloading…' }[state];
+    el.title = state === 'local' ? 'Set up config.js (Supabase) or run server.js to save outside this browser' : '';
+  }
+  let syncTimer, syncing = false, syncAgain = false;
+  function scheduleSync() {
+    if (serverRev === null) return;
+    setSync('saving');
+    clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 600);
+  }
+  async function syncNow() {
+    if (syncing) { syncAgain = true; return; }
+    syncing = true;
+    try {
+      serverRev = await backend.save(serverRev, snapshot());
+      saveLocal(false); setSync('synced');
+    } catch (e) {
+      if (e && e.stale) {
+        setSync('conflict'); toast('Changed somewhere else · reloading');
+        setTimeout(() => location.reload(), 1200); return;
+      }
+      if (e && e.auth) { toast('Signed out · please sign in again'); setTimeout(() => location.reload(), 1500); return; }
+      setSync('offline');
+      clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 5000);
+    } finally {
+      syncing = false;
+      if (syncAgain) { syncAgain = false; syncNow(); }
+    }
+  }
+  const persist = () => { saveLocal(serverRev !== null); scheduleSync(); };
+
+  // ---------- backends ----------
+  async function pickBackend() {
+    const cfg = window.JOURNAL_CONFIG || {};
+    if (cfg.supabaseUrl && cfg.supabaseAnonKey) {
+      try { return await supabaseBackend(cfg.supabaseUrl.replace(/\/+$/, ''), cfg.supabaseAnonKey); }
+      catch (e) { console.error(e); toast('Cloud sync unavailable · using this browser'); return null; }
+    }
+    if (location.protocol.startsWith('http')) {
+      try { const r = await fetch('/api/health', { cache: 'no-store' }); if (r.ok) return serverBackend(); } catch (e) {}
+    }
+    return null;
+  }
+
+  function serverBackend() {
+    return {
+      label: 'local server',
+      async load() { const r = await fetch('/api/state', { cache: 'no-store' }); if (!r.ok) throw new Error(r.status); return r.json(); },
+      async save(baseRev, state) {
+        const r = await fetch('/api/state', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ baseRev, ...state }) });
+        if (r.status === 409) throw { stale: true };
+        if (!r.ok) throw new Error(r.status);
+        return (await r.json()).rev;
+      },
+      beacon(baseRev, state) {
+        fetch('/api/state', { method: 'PUT', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ baseRev, ...state }) });
+      },
+    };
+  }
+
+  function loadScript(src) {
+    return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('could not load ' + src)); document.head.appendChild(s); });
+  }
+
+  async function supabaseBackend(url, anonKey) {
+    await loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js');
+    const sb = window.supabase.createClient(url, anonKey);
+    let { data: { session } } = await sb.auth.getSession();
+    if (!session) session = await signIn(sb);
+    if (!session) return null; // chose to continue without cloud sync
+    let token = session.access_token;
+    sb.auth.onAuthStateChange((_ev, s) => { if (s) token = s.access_token; });
+
+    const acct = $('accountBtn');
+    acct.hidden = false; acct.title = 'Signed in as ' + session.user.email;
+    acct.onclick = async () => {
+      if (!confirm(`Sign out ${session.user.email}? Notes stay in the cloud; this browser's copy is removed.`)) return;
+      await sb.auth.signOut();
+      Object.keys(localStorage).filter(k => k.startsWith(KEY)).forEach(k => localStorage.removeItem(k));
+      location.reload();
+    };
+
+    const fail = error => { const m = (error && error.message) || ''; if (/stale/.test(m)) throw { stale: true }; if (/JWT|not signed in/i.test(m)) throw { auth: true }; throw error; };
+    return {
+      label: 'cloud', userId: session.user.id,
+      async load() {
+        const { data, error } = await sb.from('journal_state').select('rev, data').maybeSingle();
+        if (error) fail(error);
+        if (!data) return { rev: 0, projects: [], entries: [] };
+        return { rev: data.rev, projects: [], entries: [], ...data.data };
+      },
+      async save(baseRev, state) {
+        const { data, error } = await sb.rpc('save_journal', { base_rev: baseRev, payload: state });
+        if (error) fail(error);
+        return data;
+      },
+      beacon(baseRev, state) {
+        fetch(url + '/rest/v1/rpc/save_journal', {
+          method: 'POST', keepalive: true,
+          headers: { 'Content-Type': 'application/json', apikey: anonKey, Authorization: 'Bearer ' + token },
+          body: JSON.stringify({ base_rev: baseRev, payload: state }),
+        });
+      },
+    };
+  }
+
+  // email sign-in link; resolves with a session, or null if the user continues without sync
+  function signIn(sb) {
+    return new Promise(resolve => {
+      const box = $('auth'); box.hidden = false;
+      const form = $('authForm'), email = $('authEmail'), msg = $('authMsg');
+      email.focus();
+      form.onsubmit = async ev => {
+        ev.preventDefault();
+        msg.textContent = 'Sending…';
+        const { error } = await sb.auth.signInWithOtp({ email: email.value.trim(), options: { emailRedirectTo: location.origin + location.pathname } });
+        msg.textContent = error ? error.message : 'Check your inbox and open the link. You can close this tab.';
+      };
+      sb.auth.onAuthStateChange((_ev, s) => { if (s) { box.hidden = true; resolve(s); } });
+      $('authSkip').onclick = () => { box.hidden = true; resolve(null); };
+    });
+  }
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  if (!projects.length) projects.push({ id: 'root', name: 'My notes', parentId: null, x: 0, y: 0 });
+  const proj = id => projects.find(p => p.id === id);
+  if (!proj(currentProject)) currentProject = projects[0].id;
+  entries.forEach(e => { if (!proj(e.projectId)) e.projectId = projects[0].id; });
+  const kids = id => projects.filter(p => p.parentId === id);
+  const pathOf = id => { const out = []; let p = proj(id); while (p) { out.unshift(p); p = proj(p.parentId); } return out; };
+  const subtree = id => [id, ...kids(id).flatMap(k => subtree(k.id))];
+  const newEntry = () => { const now = Date.now(); const e = { id: uid(), title: '', body: '', created: now, updated: now, projectId: currentProject }; entries.unshift(e); return e; };
+  if (!entries.length) {
+    const e = newEntry();
+    e.title = 'First sheet';
+    e.body = 'Welcome to your typewriter journal.\n\nThe red mark is where the next letter lands. The page moves, the mark stays.\n\nDrag sideways anywhere, or press Ctrl+Enter, to tear the page off below the mark.';
+  }
+  let current = entries[0];
+
+  const fmtDate = ts => new Date(ts).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const fmtShort = ts => new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const words = s => (s.trim().match(/\S+/g) || []).length;
+  const esc = c => c === '<' ? '&lt;' : c === '>' ? '&gt;' : c === '&' ? '&amp;' : c;
+
+  // ---------- colors: paper + background ----------
+  const BG_SWATCHES = ['#ffffff', '#f3f1ec', '#e8edf3', '#e6efe7', '#2b2b2b', '#1d2433'];
+  const isDark = hex => {
+    const n = parseInt(hex.slice(1), 16), r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255;
+    return (0.299 * r + 0.587 * g + 0.114 * b) < 140;
+  };
+  function applyColors() {
+    document.documentElement.style.setProperty('--paper', settings.paper);
+    document.body.style.setProperty('--bg', settings.bg);
+    document.body.classList.toggle('dark', isDark(settings.bg));
+  }
+  function setColor(key, c) { settings[key] = c; applyColors(); renderSwatches(); persist(); }
+  function swatchRow(boxId, key, list) {
+    const box = $(boxId); box.innerHTML = '';
+    list.forEach(c => {
+      const b = document.createElement('button'); b.className = 'sw' + (settings[key] === c ? ' on' : '');
+      b.style.background = c; b.title = c; b.onclick = () => setColor(key, c); box.appendChild(b);
+    });
+    const custom = document.createElement('label');
+    custom.className = 'sw sw-custom' + (list.includes(settings[key]) ? '' : ' on'); custom.title = 'Custom color';
+    const inp = document.createElement('input'); inp.type = 'color'; inp.value = settings[key];
+    inp.oninput = () => { settings[key] = inp.value; applyColors(); persist(); };
+    inp.onchange = () => setColor(key, inp.value);
+    custom.appendChild(inp); box.appendChild(custom);
+  }
+  function renderSwatches() { swatchRow('swatches', 'paper', SWATCHES); swatchRow('bgSwatches', 'bg', BG_SWATCHES); }
+
+  // ---------- geometry ----------
+  let cw = 11.5, lh = 30;
+  function measure() {
+    const p = document.createElement('span');
+    p.textContent = 'MMMMMMMMMM'; p.style.cssText = 'position:absolute;visibility:hidden;white-space:pre';
+    paper.appendChild(p);
+    cw = Math.ceil(p.getBoundingClientRect().width / 10 * 2) / 2;
+    p.remove();
+    lh = parseFloat(getComputedStyle(paper).lineHeight) || 30;
+    paper.style.setProperty('--cw', cw + 'px');
+    const paperW = PAD_X * 2 + COLS * cw;
+    paper.style.width = paperW + 'px';
+    paper.style.padding = `${PAD_T}px ${PAD_X}px 0`;
+    carriage.style.width = paperW + 'px';
+  }
+
+  function wrap(text) {
+    const out = []; let start = 0;
+    for (const para of text.split('\n')) {
+      if (!para.length) out.push({ s: start, t: '' });
+      let pos = 0;
+      while (pos < para.length) {
+        if (para.length - pos <= COLS) { out.push({ s: start + pos, t: para.slice(pos) }); break; }
+        const br = para.lastIndexOf(' ', pos + COLS);
+        if (br <= pos) { out.push({ s: start + pos, t: para.slice(pos, pos + COLS) }); pos += COLS; }
+        else { out.push({ s: start + pos, t: para.slice(pos, br + 1) }); pos = br + 1; }
+      }
+      start += para.length + 1;
+    }
+    return out;
+  }
+
+  let lines = [], curLine = 0, curCol = 0, roll = 0, strikeY = 0, freshFrom = -1, freshTo = -1;
+  function renderPaper() {
+    lines = wrap(ta.value);
+    const ss = ta.selectionStart, se = ta.selectionEnd;
+    let html = '';
+    lines.forEach((ln, li) => {
+      html += `<div class="line" data-l="${li}">`;
+      for (let k = 0; k < ln.t.length; k++) {
+        const i = ln.s + k, ch = ln.t[k];
+        let cls = (ss !== se && i >= ss && i < se) ? 'c sel' : 'c';
+        if (i >= freshFrom && i < freshTo) cls += ' fresh';
+        html += `<span class="${cls}" data-i="${i}">${ch === ' ' ? '&nbsp;' : esc(ch)}</span>`;
+      }
+      html += '</div>';
+    });
+    linesEl.innerHTML = html;
+  }
+
+  function caretPos() {
+    const p = ta.selectionEnd;
+    let li = 0;
+    for (let k = 0; k < lines.length; k++) { if (lines[k].s <= p) li = k; else break; }
+    return { line: li, col: Math.min(p - lines[li].s, COLS) };
+  }
+
+  function layout(animate = true) {
+    const W = stage.clientWidth;
+    strikeY = Math.round(stage.clientHeight * 0.72);
+    clip.style.height = (strikeY + PAD_B) + 'px';   // page ends just below the red mark
+    const { line, col } = caretPos();
+    carriage.classList.toggle('returning', animate && (line !== curLine || col < curCol - 3));
+    if (!animate) { carriage.style.transition = 'none'; paper.style.transition = 'none'; }
+    curLine = line; curCol = col;
+
+    const x = W / 2 - (PAD_X + col * cw + cw / 2);
+    carriage.style.transform = `translateX(${x}px)`;
+    const lineBottom = PAD_T + $('head').offsetHeight + (line + 1) * lh;
+    paper.style.transform = `translateY(${strikeY - lineBottom + roll * lh}px)`;
+
+    // vertical "|" cursor at the left edge of the next letter's cell
+    indicator.style.left = (W / 2 - cw / 2 - 1) + 'px';
+    indicator.style.top = (strikeY - lh + 4) + 'px';
+    indicator.style.height = (lh - 6) + 'px';
+    indicator.style.opacity = roll ? .25 : '';
+    ta.style.left = (W / 2) + 'px'; ta.style.top = (strikeY - lh) + 'px';
+    $('hint').classList.toggle('show', roll > 0);
+    if (!animate) requestAnimationFrame(() => { carriage.style.transition = ''; paper.style.transition = ''; });
+  }
+
+  // ---------- sound ----------
+  let ctx;
+  const audio = () => (ctx ||= new (window.AudioContext || window.webkitAudioContext)());
+  function noise(dur, freq, gain, q = 1.2, when = 0) {
+    const a = audio(), len = Math.floor(a.sampleRate * dur), buf = a.createBuffer(1, len, a.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 4);
+    const src = a.createBufferSource(); src.buffer = buf;
+    const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q;
+    const g = a.createGain(); g.gain.value = gain;
+    src.connect(f).connect(g).connect(a.destination); src.start(a.currentTime + when);
+  }
+  const on = () => settings.sound;
+  const sfx = {
+    key() { on() && noise(.03, 2400 + Math.random() * 1200, .45); },
+    space() { on() && noise(.04, 1000, .4, .8); },
+    back() { on() && noise(.025, 1500, .3); },
+    tick() { on() && noise(.012, 3400, .15); },
+    ret() { if (!on()) return; for (let i = 0; i < 7; i++) noise(.016, 3000 - i * 140, .2, 1.2, i * .02); noise(.06, 800, .5, .7, .16); },
+    rip() { if (!on()) return; for (let i = 0; i < 14; i++) noise(.04 + Math.random() * .05, 1200 + Math.random() * 3000, .3 + Math.random() * .25, .6, i * .028); },
+    bell() {
+      if (!on()) return;
+      const a = audio(), o = a.createOscillator(), g = a.createGain();
+      o.type = 'sine'; o.frequency.value = 2093;
+      g.gain.setValueAtTime(.12, a.currentTime); g.gain.exponentialRampToValueAtTime(.0005, a.currentTime + 1);
+      o.connect(g).connect(a.destination); o.start(); o.stop(a.currentTime + 1.1);
+    }
+  };
+
+  // ---------- typing ----------
+  let bellLine = -1;
+  function typing() { stage.classList.add('typing'); clearTimeout(typing.t); typing.t = setTimeout(() => stage.classList.remove('typing'), 600); }
+  ta.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); tear(1); return; }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = e.key;
+    if (k === 'Backspace' || k === 'Delete') {
+      if (settings.noBackspace) { e.preventDefault(); toast('No going back. Keep typing.'); return; }
+      sfx.back(); return;
+    }
+    if (k === 'Enter') { sfx.ret(); return; }
+    if (k.length !== 1) return;
+    k === ' ' ? sfx.space() : sfx.key();
+    typing();
+    if (curCol === COLS - 9 && bellLine !== curLine) { bellLine = curLine; setTimeout(sfx.bell, 40); }
+  });
+  ta.addEventListener('input', e => {
+    roll = 0;
+    // newly typed letters show up only after the page has moved
+    if (e.inputType === 'insertText' && e.data) { freshTo = ta.selectionStart; freshFrom = freshTo - e.data.length; }
+    else freshFrom = freshTo = -1;
+    renderPaper();
+    freshFrom = freshTo = -1;
+    const before = curLine;
+    layout();
+    if (curLine > before && e.inputType === 'insertText') sfx.ret();
+    if (curLine !== before) bellLine = -1;
+    updateCount(); scheduleSave();
+  });
+  let hadSel = false;
+  document.addEventListener('selectionchange', () => {
+    if (document.activeElement !== ta) return;
+    const sel = ta.selectionStart !== ta.selectionEnd;
+    if (sel || hadSel) renderPaper();
+    hadSel = sel;
+    layout();
+  });
+
+  // ---------- pointer: click = move to letter, drag sideways = tear ----------
+  let drag = null;
+  const tearReady = d => {
+    const span = Math.abs(d.lx - d.x), drift = Math.abs(d.ly - d.y);
+    return span >= Math.min(320, stage.clientWidth * 0.4) && drift < span * 0.5;
+  };
+  function showTear(d) {
+    const pr = paper.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+    const left = Math.max(pr.left, sr.left) - sr.left, right = Math.min(pr.right, sr.right) - sr.left;
+    tearEl.style.left = left + 'px'; tearEl.style.width = Math.max(0, right - left) + 'px';
+    tearEl.style.top = (strikeY + PAD_B) + 'px';
+    tearEl.classList.add('show');
+    tearEl.classList.toggle('ready', tearReady(d));
+  }
+  stage.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault(); ta.focus();
+    drag = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, moved: false, target: e.target };
+    stage.setPointerCapture(e.pointerId);
+  });
+  stage.addEventListener('pointermove', e => {
+    if (!drag) return;
+    drag.lx = e.clientX; drag.ly = e.clientY;
+    if (!drag.moved && Math.hypot(drag.lx - drag.x, drag.ly - drag.y) < 6) return;
+    drag.moved = true; showTear(drag);
+  });
+  const endDrag = e => {
+    if (!drag) return;
+    const d = drag; drag = null;
+    d.lx = e.clientX; d.ly = e.clientY;
+    if (Math.hypot(d.lx - d.x, d.ly - d.y) >= 6) d.moved = true;
+    tearEl.classList.remove('show', 'ready');
+    if (!d.moved) {
+      const c = d.target.closest && d.target.closest('.c'), ln = d.target.closest && d.target.closest('.line');
+      if (c) ta.setSelectionRange(+c.dataset.i, +c.dataset.i);
+      else if (ln) { const L = lines[+ln.dataset.l]; const end = L.s + L.t.replace(/ $/, '').length; ta.setSelectionRange(end, end); }
+      roll = 0; layout(); ta.focus();
+      return;
+    }
+    if (e.type === 'pointerup' && tearReady(d)) tear(d.lx > d.x ? 1 : -1);
+    ta.focus();
+  };
+  stage.addEventListener('pointerup', endDrag);
+  stage.addEventListener('pointercancel', endDrag);
+
+  function tear(dir) {
+    const pr = paper.getBoundingClientRect(), cr = clip.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+    const top = Math.max(pr.top, sr.top), bottom = cr.bottom;
+    const box = { left: pr.left, top, width: pr.width, height: bottom - top + 6 };
+    const piece = document.createElement('div');
+    piece.className = 'torn';
+    Object.assign(piece.style, { left: box.left + 'px', top: box.top + 'px', width: box.width + 'px', height: box.height + 'px' });
+    const copy = paper.cloneNode(true);
+    copy.removeAttribute('id'); copy.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
+    copy.style.transform = `translateY(${pr.top - top}px)`;
+    piece.appendChild(copy);
+    // ragged bottom edge
+    const pts = ['0px 0px', `${box.width}px 0px`];
+    for (let x = box.width; x >= 0; x -= 8) pts.push(`${x}px ${box.height - 3 - Math.random() * 7}px`);
+    piece.style.clipPath = `polygon(${pts.join(',')})`;
+    document.body.appendChild(piece);
+    sfx.rip();
+    // the torn sheet flies to the Board tab, where it gets pinned
+    const tab = $('boardTab').getBoundingClientRect();
+    const tx = tab.left + tab.width / 2 - (box.left + box.width / 2), ty = tab.top + tab.height / 2 - (box.top + box.height / 2);
+    piece.style.transformOrigin = '50% 50%';
+    piece.animate([
+      { transform: 'none', opacity: 1 },
+      { transform: `translate(${dir * 24}px,-16px) rotate(${dir * 2}deg)`, opacity: 1, offset: .2 },
+      { transform: `translate(${tx}px,${ty}px) rotate(${dir * 8}deg) scale(.04)`, opacity: .6 }
+    ], { duration: 850, easing: 'cubic-bezier(.5,0,.6,1)' }).onfinish = () => {
+      piece.remove();
+      const t = $('boardTab'); t.classList.remove('bump'); void t.offsetWidth; t.classList.add('bump');
+    };
+
+    current.body = ta.value; current.title = titleEl.value; current.updated = Date.now();
+    if (!current.body.trim() && !current.title.trim()) entries = entries.filter(x => x !== current);
+    const next = newEntry();
+    persist();
+    open(next);
+    // new sheet feeds in from below the mark
+    paper.style.transition = 'none';
+    paper.style.transform = `translateY(${strikeY + 40}px)`;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      paper.style.transition = 'transform .45s ease-out'; layout();
+      setTimeout(() => { paper.style.transition = ''; }, 500);
+    }));
+    toast('Pinned to ' + proj(currentProject).name);
+  }
+
+  stage.addEventListener('wheel', e => {
+    e.preventDefault();
+    const next = Math.max(0, Math.min(curLine + 2, roll + (e.deltaY < 0 ? 1 : -1)));
+    if (next !== roll) { roll = next; sfx.tick(); layout(); }
+  }, { passive: false });
+
+  // ---------- entries ----------
+  function renderHead() {
+    const t = titleEl.value.trim();
+    $('hTitle').textContent = t || 'Untitled';
+    $('hTitle').classList.toggle('ph', !t);
+    $('hDate').textContent = fmtDate(current.created);
+  }
+  function renderList() {
+    const q = searchEl.value.trim().toLowerCase();
+    $('notesHead').textContent = q ? 'Search' : 'Notes · ' + proj(currentProject).name;
+    const shown = entries.filter(e => q ? (e.title + ' ' + e.body).toLowerCase().includes(q) : e.projectId === currentProject);
+    if (!shown.length) { listEl.innerHTML = `<div class="empty">${q ? 'Nothing matches.' : 'No sheets here yet.'}</div>`; return; }
+    listEl.innerHTML = '';
+    shown.forEach(e => {
+      const li = document.createElement('li');
+      if (e.id === current.id) li.className = 'active';
+      const t = document.createElement('div'); t.className = 'title'; t.textContent = e.title || 'Untitled';
+      const m = document.createElement('div'); m.className = 'meta';
+      m.textContent = (q ? proj(e.projectId).name + ' · ' : fmtShort(e.created) + ' · ') + (e.body.replace(/\s+/g, ' ').slice(0, 50) || 'Empty');
+      li.append(t, m);
+      li.onclick = () => { open(e); document.body.classList.remove('drawer'); if (settings.mode === 'board') { renderBoard(); centerOn(e.bx + 85, e.by + 62); } };
+      listEl.appendChild(li);
+    });
+  }
+
+  // ---------- project tree ----------
+  function renderTree() {
+    const box = $('tree'); box.innerHTML = '';
+    const onPath = pathOf(currentProject).map(p => p.id);
+    const walk = (p, depth) => {
+      const row = document.createElement('div');
+      row.className = 'prow' + (p.id === currentProject ? ' active' : onPath.includes(p.id) ? ' path' : '');
+      row.style.paddingLeft = (8 + depth * 14) + 'px';
+      const n = entries.filter(e => e.projectId === p.id).length;
+      row.innerHTML = `<span class="dot"></span><span class="pname"></span><span class="pcount">${n || ''}</span>
+        <span class="pacts"><button data-a="add" title="Add sub-project">+</button><button data-a="ren" title="Rename">✎</button>${projects.length > 1 ? '<button data-a="del" title="Delete project">×</button>' : ''}</span>`;
+      row.querySelector('.pname').textContent = p.name;
+      row.onclick = ev => {
+        const a = ev.target.dataset && ev.target.dataset.a;
+        if (a === 'add') addProject(p.id);
+        else if (a === 'ren') renameProject(p.id);
+        else if (a === 'del') deleteProject(p.id);
+        else selectProject(p.id);
+      };
+      box.appendChild(row);
+      kids(p.id).forEach(k => walk(k, depth + 1));
+    };
+    projects.filter(p => !p.parentId).forEach(p => walk(p, 0));
+  }
+  function renderCrumb() { $('crumb').textContent = pathOf(currentProject).map(p => p.name).join(' / ') + ' /'; }
+
+  function selectProject(id) {
+    currentProject = id;
+    if (current.projectId !== id) {
+      const first = entries.find(e => e.projectId === id);
+      open(first || newEntry());
+    }
+    refreshAll();
+    if (settings.mode === 'board') { const p = proj(id); centerOn(p.x, p.y); }
+  }
+  function addProject(parentId, at) {
+    const name = (prompt(parentId ? `New sub-project in "${proj(parentId).name}"` : 'New project') || '').trim();
+    if (!name) return;
+    let x, y;
+    if (at) { x = at.x; y = at.y; }
+    else if (parentId) {
+      // children hang below the parent, side by side, leaving room for pinned notes
+      const par = proj(parentId), ks = kids(parentId);
+      y = par.y + 300; x = ks.length ? Math.max(...ks.map(k => k.x)) + 640 : par.x;
+    }
+    else { x = Math.max(...projects.map(p => p.x)) + 520; y = 0; }
+    const p = { id: uid(), name, parentId: parentId || null, x, y };
+    projects.push(p);
+    persist();
+    selectProject(p.id);
+  }
+  function renameProject(id) {
+    const p = proj(id);
+    const name = (prompt('Rename project', p.name) || '').trim();
+    if (!name) return;
+    p.name = name; persist(); refreshAll();
+  }
+  function deleteProject(id) {
+    const p = proj(id);
+    const target = p.parentId ? proj(p.parentId) : projects.find(q => q.id !== id && !q.parentId) || projects.find(q => q.id !== id);
+    if (!target) return;
+    if (!confirm(`Delete project "${p.name}"? Its notes and sub-projects move to "${target.name}".`)) return;
+    entries.forEach(e => { if (e.projectId === id) { e.projectId = target.id; e.bx = e.by = undefined; } });
+    kids(id).forEach(k => { k.parentId = target.id === k.id ? null : target.id; });
+    projects = projects.filter(q => q !== p);
+    if (currentProject === id) currentProject = target.id;
+    persist(); refreshAll();
+  }
+  function refreshAll() { renderTree(); renderCrumb(); renderList(); if (settings.mode === 'board') renderBoard(); }
+
+  function open(e) {
+    // drop the sheet we are leaving if nothing was written on it
+    if (current && current !== e && !current.body.trim() && !current.title.trim()) entries = entries.filter(x => x !== current);
+    if (current && current !== e && entries.includes(current)) { current.title = titleEl.value; current.body = ta.value; }
+    current = e;
+    if (e.projectId !== currentProject) { currentProject = e.projectId; renderTree(); renderCrumb(); }
+    titleEl.value = e.title; ta.value = e.body;
+    ta.setSelectionRange(e.body.length, e.body.length);
+    roll = 0;
+    renderHead(); renderPaper(); layout(false); updateCount(); renderList(); renderTree();
+  }
+
+  // ---------- board ----------
+  const board = $('board'), world = $('world'), edgesEl = $('edges');
+  const NOTE_W = 170, NOTE_H = 124;
+  let view = settings.view || null;
+  function applyView() {
+    world.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.z})`;
+    board.style.backgroundPosition = `${view.x}px ${view.y}px`;
+    board.style.backgroundSize = `${24 * view.z}px ${24 * view.z}px`;
+  }
+  function centerOn(x, y, animate = true) {
+    if (!view) view = { x: 0, y: 0, z: 1 };
+    view.x = board.clientWidth / 2 - x * view.z; view.y = board.clientHeight / 2.6 - y * view.z;
+    if (animate) { world.classList.add('anim'); setTimeout(() => world.classList.remove('anim'), 380); }
+    applyView(); settings.view = view; persist();
+  }
+  const toWorld = (cx, cy) => { const r = board.getBoundingClientRect(); return { x: (cx - r.left - view.x) / view.z, y: (cy - r.top - view.y) / view.z }; };
+
+  function placeNotes() {
+    projects.forEach(p => {
+      entries.filter(e => e.projectId === p.id).forEach((e, i) => {
+        if (e.bx == null) { e.bx = p.x + 110 + (i % 3) * (NOTE_W + 20); e.by = p.y - 50 + Math.floor(i / 3) * (NOTE_H + 24); }
+      });
+    });
+  }
+  function drawEdges() {
+    const hot = pathOf(currentProject).map(p => p.id);
+    let s = '';
+    projects.forEach(p => {
+      if (!p.parentId) return;
+      const q = proj(p.parentId), my = (q.y + p.y) / 2;
+      s += `<path class="edge${hot.includes(p.id) ? ' hot' : ''}" d="M${q.x},${q.y} C${q.x},${my} ${p.x},${my} ${p.x},${p.y}"/>`;
+    });
+    entries.forEach(e => {
+      const p = proj(e.projectId);
+      s += `<line class="string${e.projectId === currentProject ? ' hot' : ''}" x1="${e.bx + NOTE_W / 2}" y1="${e.by + 11}" x2="${p.x}" y2="${p.y}"/>`;
+    });
+    edgesEl.innerHTML = s;
+  }
+  function renderBoard() {
+    if (!view) { view = { x: 0, y: 0, z: 1 }; const p = proj(currentProject); centerOn(p.x, p.y, false); }
+    placeNotes();
+    world.querySelectorAll('.pnode, .note').forEach(n => n.remove());
+    projects.forEach(p => {
+      const d = document.createElement('div');
+      d.className = 'pnode' + (p.id === currentProject ? ' current' : '');
+      d.style.left = p.x + 'px'; d.style.top = p.y + 'px'; d.dataset.pid = p.id;
+      d.textContent = p.name;
+      const n = entries.filter(e => e.projectId === p.id).length;
+      if (n) { const sm = document.createElement('small'); sm.textContent = n; d.appendChild(sm); }
+      world.appendChild(d);
+    });
+    entries.forEach(e => {
+      const d = document.createElement('div');
+      d.className = 'note' + (e.id === current.id ? ' active' : '');
+      d.style.left = e.bx + 'px'; d.style.top = e.by + 'px'; d.dataset.eid = e.id;
+      const body = e.id === current.id ? ta.value : e.body, title = e.id === current.id ? titleEl.value : e.title;
+      d.innerHTML = '<span class="pin"></span><div class="nt"></div><div class="nd"></div><div class="ns"></div>';
+      d.querySelector('.nt').textContent = title || 'Untitled';
+      d.querySelector('.nt').classList.toggle('ph', !title);
+      d.querySelector('.nd').textContent = fmtShort(e.created);
+      d.querySelector('.ns').textContent = body.slice(0, 200);
+      world.appendChild(d);
+    });
+    drawEdges(); applyView();
+  }
+
+  // update highlights without rebuilding nodes (keeps double-click targets alive)
+  function refreshBoardMarks() {
+    world.querySelectorAll('.note').forEach(n => {
+      if (!entries.some(x => x.id === n.dataset.eid)) n.remove();
+      else n.classList.toggle('active', n.dataset.eid === current.id);
+    });
+    world.querySelectorAll('.pnode').forEach(n => n.classList.toggle('current', n.dataset.pid === currentProject));
+    drawEdges();
+  }
+
+  let bd = null;
+  board.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || e.target.closest('.board-ui')) return;
+    const w = toWorld(e.clientX, e.clientY);
+    const noteEl = e.target.closest('.note'), pEl = e.target.closest('.pnode');
+    board.setPointerCapture(e.pointerId);
+    if (noteEl) {
+      const en = entries.find(x => x.id === noteEl.dataset.eid);
+      bd = { type: 'note', en, el: noteEl, ox: w.x - en.bx, oy: w.y - en.by, sx: e.clientX, sy: e.clientY, moved: false };
+      world.appendChild(noteEl); // bring to front
+    } else if (pEl) {
+      bd = { type: 'proj', p: proj(pEl.dataset.pid), lx: w.x, ly: w.y, sx: e.clientX, sy: e.clientY, moved: false };
+    } else {
+      bd = { type: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y, moved: false };
+    }
+  });
+  board.addEventListener('pointermove', e => {
+    if (!bd) return;
+    if (!bd.moved && Math.hypot(e.clientX - bd.sx, e.clientY - bd.sy) < 4) return;
+    bd.moved = true;
+    const w = toWorld(e.clientX, e.clientY);
+    if (bd.type === 'pan') {
+      board.classList.add('panning');
+      view.x = bd.vx + e.clientX - bd.sx; view.y = bd.vy + e.clientY - bd.sy; applyView();
+    } else if (bd.type === 'note') {
+      bd.el.classList.add('dragging');
+      bd.en.bx = w.x - bd.ox; bd.en.by = w.y - bd.oy;
+      bd.el.style.left = bd.en.bx + 'px'; bd.el.style.top = bd.en.by + 'px';
+      const over = document.elementsFromPoint(e.clientX, e.clientY).find(n => n.classList && n.classList.contains('pnode'));
+      world.querySelectorAll('.pnode.drop').forEach(n => n !== over && n.classList.remove('drop'));
+      if (over && over.dataset.pid !== bd.en.projectId) over.classList.add('drop');
+      bd.over = over && over.dataset.pid !== bd.en.projectId ? over.dataset.pid : null;
+      drawEdges();
+    } else if (bd.type === 'proj') {
+      // moving a project carries its whole branch and every note pinned to it
+      const dx = w.x - bd.lx, dy = w.y - bd.ly; bd.lx = w.x; bd.ly = w.y;
+      const ids = subtree(bd.p.id);
+      projects.forEach(p => { if (ids.includes(p.id)) { p.x += dx; p.y += dy; } });
+      entries.forEach(en => { if (ids.includes(en.projectId)) { en.bx += dx; en.by += dy; } });
+      world.querySelectorAll('.pnode').forEach(n => { if (ids.includes(n.dataset.pid)) { const p = proj(n.dataset.pid); n.style.left = p.x + 'px'; n.style.top = p.y + 'px'; } });
+      world.querySelectorAll('.note').forEach(n => { const en = entries.find(x => x.id === n.dataset.eid); if (ids.includes(en.projectId)) { n.style.left = en.bx + 'px'; n.style.top = en.by + 'px'; } });
+      drawEdges();
+    }
+  });
+  // pointer capture retargets native dblclick to the board, so detect double taps here
+  let lastTap = { key: null, t: 0 };
+  const isDouble = key => { const now = Date.now(), dbl = lastTap.key === key && now - lastTap.t < 400; lastTap = dbl ? { key: null, t: 0 } : { key, t: now }; return dbl; };
+  const boardUp = e => {
+    if (!bd) return;
+    const d = bd; bd = null;
+    board.classList.remove('panning');
+    if (d.type === 'pan') {
+      if (!d.moved && e.type === 'pointerup' && isDouble('empty')) addProject(currentProject, toWorld(e.clientX, e.clientY));
+      settings.view = view; persist(); return;
+    }
+    if (d.type === 'note') {
+      d.el.classList.remove('dragging');
+      if (!d.moved) {
+        if (isDouble('n:' + d.en.id)) { open(d.en); setMode('write'); return; }
+        open(d.en); refreshBoardMarks(); return;
+      }
+      if (d.over) {
+        // re-pin beside the new project (after its existing notes) instead of on top of it
+        const p = proj(d.over), n = entries.filter(x => x.projectId === d.over).length;
+        d.en.bx = p.x + 110 + (n % 3) * (NOTE_W + 20); d.en.by = p.y - 50 + Math.floor(n / 3) * (NOTE_H + 24);
+        d.en.projectId = d.over; toast('Moved to ' + proj(d.over).name); if (d.en === current) currentProject = d.over; }
+      persist(); refreshAll(); return;
+    }
+    if (d.type === 'proj') {
+      if (!d.moved) {
+        if (isDouble('p:' + d.p.id)) renameProject(d.p.id);
+        else if (d.p.id !== currentProject) selectProject(d.p.id);
+      }
+      persist(); if (d.moved) drawEdges();
+    }
+  };
+  board.addEventListener('pointerup', boardUp);
+  board.addEventListener('pointercancel', boardUp);
+  board.addEventListener('wheel', e => {
+    e.preventDefault();
+    const r = board.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    const z = Math.min(2, Math.max(.25, view.z * Math.exp(-e.deltaY * 0.0015)));
+    view.x = mx - (mx - view.x) * z / view.z; view.y = my - (my - view.y) * z / view.z; view.z = z;
+    applyView(); clearTimeout(board.t); board.t = setTimeout(() => { settings.view = view; persist(); }, 300);
+  }, { passive: false });
+  $('centerBtn').onclick = () => { const p = proj(currentProject); centerOn(p.x, p.y); };
+  $('addChildBtn').onclick = () => addProject(currentProject);
+  $('addRootBtn').onclick = () => addProject(null);
+
+  function setMode(m) {
+    if (m === 'board') { current.title = titleEl.value; current.body = ta.value; persist(); }
+    settings.mode = m; persist();
+    document.body.classList.toggle('board-mode', m === 'board');
+    $('writeTab').classList.toggle('on', m === 'write');
+    $('boardTab').classList.toggle('on', m === 'board');
+    if (m === 'board') renderBoard();
+    else { requestAnimationFrame(() => { layout(false); ta.focus(); }); }
+  }
+  $('writeTab').onclick = () => setMode('write');
+  $('boardTab').onclick = () => setMode('board');
+  function updateCount() { const w = words(ta.value); $('count').textContent = `${w} word${w === 1 ? '' : 's'}`; }
+
+  let saveTimer;
+  function scheduleSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => { current.title = titleEl.value; current.body = ta.value; current.updated = Date.now(); persist(); renderList(); }, 400);
+  }
+
+  titleEl.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); ta.focus(); } });
+  titleEl.addEventListener('input', () => { renderHead(); layout(); scheduleSave(); });
+
+  $('newBtn').onclick = () => { open(newEntry()); persist(); renderTree(); if (settings.mode === 'board') setMode('write'); titleEl.focus(); };
+  $('deleteBtn').onclick = () => {
+    if (!confirm(`Delete "${current.title || 'Untitled'}"? This cannot be undone.`)) return;
+    entries = entries.filter(e => e.id !== current.id);
+    persist(); open(entries.find(e => e.projectId === currentProject) || newEntry()); renderTree(); toast('Deleted');
+  };
+  $('exportBtn').onclick = () => {
+    const txt = entries.map(e => `${e.title || 'Untitled'}\n${fmtDate(e.created)}\n\n${e.body}\n`).join('\n' + '-'.repeat(60) + '\n\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain' }));
+    a.download = `journal-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  $('menuBtn').onclick = () => document.body.classList.toggle('drawer');
+  document.addEventListener('click', e => {
+    if (document.body.classList.contains('drawer') && !e.target.closest('aside') && e.target.id !== 'menuBtn') document.body.classList.remove('drawer');
+  });
+  searchEl.addEventListener('input', renderList);
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'n') { e.preventDefault(); $('newBtn').click(); }
+    if (settings.mode !== 'write') return;
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag !== 'INPUT' && tag !== 'TEXTAREA' && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) ta.focus();
+  });
+  [['soundToggle', 'sound'], ['noBackspace', 'noBackspace']].forEach(([id, k]) => {
+    const el = $(id); el.checked = settings[k];
+    el.onchange = () => { settings[k] = el.checked; persist(); };
+  });
+
+  let toastTimer;
+  function toast(msg) {
+    const t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 1500);
+  }
+
+  const relayout = () => { measure(); renderPaper(); layout(false); };
+  window.addEventListener('resize', relayout);
+  document.fonts && document.fonts.ready.then(relayout);
+
+  applyColors();
+  renderSwatches();
+  persist();
+  measure();
+  open(current);
+  renderTree(); renderCrumb();
+  setMode(settings.mode === 'board' ? 'board' : 'write');
+
+  setSync(serverRev === null ? 'local' : 'synced');
+  if (startOffline) { setSync('offline'); syncTimer = setTimeout(syncNow, 5000); }
+  else if (pushOnStart) syncNow();
+  if (conflictSaved) toast('Older unsaved browser edits were kept aside; saved copy loaded');
+  // last-chance save when the tab closes (keepalive lets the request outlive the page)
+  addEventListener('pagehide', () => {
+    current.title = titleEl.value; current.body = ta.value;
+    saveLocal(serverRev !== null);
+    if (backend && serverRev !== null) { try { backend.beacon(serverRev, snapshot()); } catch (e) {} }
+  });
+})();
+</script>
+</body>
+</html>
