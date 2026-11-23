@@ -19,8 +19,10 @@
     --muted: #8b8b86;
     --red: #e0362c;
     --paper: #fbf8f1;
-    --type-size: 19px;
-    --line: 30px;
+    /* paper text grows with the screen (≈20px on a laptop, ≈28px on a 2K screen); A−/A+ multiplies it */
+    --scale: 1;
+    --type-size: calc(clamp(17px, 1.1vw + 6px, 32px) * var(--scale));
+    --line: calc(var(--type-size) * 1.6);
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; }
@@ -184,7 +186,11 @@
     .menu-btn { display: inline-block; }
     .title-input { width: 140px; }
   }
-  @media (max-width: 600px) { :root { --type-size: 16px; --line: 26px; } }
+  @media (max-width: 600px) { :root { --type-size: calc(16px * var(--scale)); } }
+  .sizer { display: inline-flex; border: 1px solid var(--line-c); border-radius: 6px; overflow: hidden; }
+  .sizer button { font: inherit; font-size: 13px; border: 0; background: transparent; color: var(--text); padding: 5px 9px; cursor: pointer; }
+  .sizer button:hover { background: var(--hover); }
+  .sizer button + button { border-left: 1px solid var(--line-c); }
 </style>
 </head>
 <body>
@@ -208,6 +214,7 @@
       <div class="group">
         <span class="muted">Paper</span><div class="swatches" id="swatches" title="Paper color"></div>
         <span class="muted">Background</span><div class="swatches" id="bgSwatches" title="Background color"></div>
+        <span class="sizer write-only" title="Text size"><button id="smallerBtn" aria-label="Smaller text">A−</button><button id="biggerBtn" aria-label="Bigger text">A+</button></span>
         <label class="toggle write-only"><input type="checkbox" id="soundToggle" checked> Sound</label>
         <label class="toggle write-only"><input type="checkbox" id="noBackspace"> No backspace</label>
         <span class="muted write-only" id="count">0 words</span>

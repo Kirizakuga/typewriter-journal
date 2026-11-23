@@ -68,6 +68,7 @@
     settings.bg = color(settings.bg, '#ffffff');
     settings.mode = settings.mode === 'board' ? 'board' : 'write';
     settings.sound = settings.sound !== false; settings.noBackspace = settings.noBackspace === true;
+    settings.textScale = Math.min(1.6, Math.max(0.7, N(settings.textScale, 1)));
     const v = settings.view;
     settings.view = v && typeof v === 'object' ? { x: N(v.x), y: N(v.y), z: Math.min(2, Math.max(.25, N(v.z, 1))) } : null;
   }
@@ -842,6 +843,16 @@
   const relayout = () => { measure(); renderPaper(); layout(false); };
   window.addEventListener('resize', relayout);
   document.fonts && document.fonts.ready.then(relayout);
+
+  // text size: the base follows screen width (CSS), A−/A+ multiplies it in 10% steps
+  const applyScale = () => document.documentElement.style.setProperty('--scale', settings.textScale);
+  const stepScale = d => {
+    settings.textScale = Math.round(Math.min(1.6, Math.max(0.7, settings.textScale + d)) * 10) / 10;
+    applyScale(); relayout(); persist(); toast(`Text ${Math.round(settings.textScale * 100)}%`); ta.focus();
+  };
+  $('smallerBtn').onclick = () => stepScale(-0.1);
+  $('biggerBtn').onclick = () => stepScale(0.1);
+  applyScale();
 
   applyColors();
   renderSwatches();
