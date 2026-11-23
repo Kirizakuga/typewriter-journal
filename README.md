@@ -19,12 +19,12 @@ The browser always keeps an offline copy too. Edits made offline are uploaded wh
 ## Cloud setup (Supabase)
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor**, paste [`supabase/schema.sql`](supabase/schema.sql) and run it.
+2. Create the tables. Either link this repo in Supabase (**Project Settings → Integrations → GitHub**, with "Deploy to production" on), which applies [`supabase/migrations/`](supabase/migrations) on every push to `main`, or paste the migration file into **SQL Editor** and run it.
 3. Go to **Authentication → URL Configuration**. Set **Site URL** to the live URL above, and add it under **Redirect URLs**. Add `http://localhost:3000` there too if you use the local server.
 4. Go to **Project Settings → API**. Copy the **Project URL** and the **anon public** key into [`config.js`](config.js).
 5. Optional: once your own account exists, turn off **Allow new users to sign up** under **Authentication → Providers → Email**, so nobody else can create an account.
 
-The anon key is meant to be public. Row-level security in `schema.sql` lets each user read and write only their own journal.
+The anon key is meant to be public. Row-level security in the migration lets each user read and write only their own journal.
 
 ## Run locally
 

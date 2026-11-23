@@ -355,7 +355,7 @@
       try { return await supabaseBackend(cfg.supabaseUrl.replace(/\/+$/, ''), cfg.supabaseAnonKey); }
       catch (e) { console.error(e); toast('Cloud sync unavailable · using this browser'); return null; }
     }
-    if (location.protocol.startsWith('http')) {
+    if (location.protocol.startsWith('http') && !location.hostname.endsWith('github.io')) {
       try { const r = await fetch('/api/health', { cache: 'no-store' }); if (r.ok) return serverBackend(); } catch (e) {}
     }
     return null;

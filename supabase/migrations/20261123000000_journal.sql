@@ -1,5 +1,6 @@
 -- Typewriter Journal: Supabase schema.
--- Run once in the Supabase dashboard: SQL Editor -> New query -> paste -> Run.
+-- Applied automatically by the Supabase GitHub integration (or paste into SQL Editor and Run).
+-- Safe to run more than once.
 --
 -- One row per signed-in user holds that user's whole journal (projects, notes, settings) as JSON.
 -- Row-level security makes every row visible and writable only by its owner.
