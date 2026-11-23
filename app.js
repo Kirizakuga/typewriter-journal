@@ -274,40 +274,124 @@
     p.remove();
     lh = parseFloat(getComputedStyle(paper).lineHeight) || 30;
     paper.style.setProperty('--cw', cw + 'px');
+    mathSizeCache.clear(); // formula widths depend on the font size
     const paperW = PAD_X * 2 + COLS * cw;
     paper.style.width = paperW + 'px';
     paper.style.padding = `${PAD_T}px ${PAD_X}px 0`;
     carriage.style.width = paperW + 'px';
   }
 
+  // ---------- math (KaTeX, Notion-style) ----------
+  // Notes stay plain text. `$…$` is inline math and a paragraph that is `$$…$$` is a block equation.
+  // On the page each formula is one atomic item that takes as many letter columns as its rendered width,
+  // so the carriage still moves in whole columns.
+  const escStr = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const mathHtmlCache = new Map(), mathSizeCache = new Map();
+  function katexHTML(src, display) {
+    const key = (display ? 'D' : 'I') + src;
+    if (mathHtmlCache.has(key)) return mathHtmlCache.get(key);
+    let html = null;
+    try { if (window.katex) html = katex.renderToString(src, { displayMode: display, throwOnError: false, output: 'html' }); } catch (e) {}
+    if (html === null) return `<span class="m-raw">${escStr(display ? '$$' + src + '$$' : '$' + src + '$')}</span>`; // not cached: KaTeX may still be loading
+    mathHtmlCache.set(key, html);
+    return html;
+  }
+  function mathSize(src, display) {
+    const key = (display ? 'D' : 'I') + src;
+    if (mathSizeCache.has(key)) return mathSizeCache.get(key);
+    const m = document.createElement(display ? 'div' : 'span');
+    m.className = display ? 'mb-measure' : 'm-measure';
+    m.innerHTML = katexHTML(src, display);
+    paper.appendChild(m);
+    const size = { w: m.offsetWidth, h: m.offsetHeight };
+    m.remove();
+    if (window.katex) mathSizeCache.set(key, size);
+    return size;
+  }
+
+  // split one paragraph into items: single letters, inline formulas, or one block equation
+  function paraItems(para, start) {
+    const bm = /^\$\$(.+)\$\$\s*$/.exec(para);
+    if (bm && bm[1].trim()) {
+      const sz = mathSize(bm[1], true);
+      return [{ kind: 'block', s: start, e: start + para.length, src: bm[1], cols: COLS, rows: Math.max(1, Math.ceil((sz.h + 10) / lh)) }];
+    }
+    const items = [];
+    let i = 0;
+    while (i < para.length) {
+      const ch = para[i];
+      if (ch === '\\' && para[i + 1] === '$') { // \$ is a literal dollar sign
+        items.push({ kind: 'ch', s: start + i, e: start + i + 1, ch, cols: 1 });
+        items.push({ kind: 'ch', s: start + i + 1, e: start + i + 2, ch: '$', cols: 1 });
+        i += 2; continue;
+      }
+      if (ch === '$' && para[i + 1] !== '$') {
+        const j = para.indexOf('$', i + 1);
+        if (j > i + 1 && para.slice(i + 1, j).trim()) {
+          const src = para.slice(i + 1, j), sz = mathSize(src, false);
+          items.push({ kind: 'math', s: start + i, e: start + j + 1, src, cols: Math.min(COLS, Math.max(1, Math.ceil((sz.w + 6) / cw))) });
+          i = j + 1; continue;
+        }
+      }
+      items.push({ kind: 'ch', s: start + i, e: start + i + 1, ch, cols: 1 });
+      i++;
+    }
+    return items;
+  }
+
+  // word-wrap items into lines of COLS columns; a block equation gets a line (several rows) of its own
   function wrap(text) {
     const out = []; let start = 0;
     for (const para of text.split('\n')) {
-      if (!para.length) out.push({ s: start, t: '' });
-      let pos = 0;
-      while (pos < para.length) {
-        if (para.length - pos <= COLS) { out.push({ s: start + pos, t: para.slice(pos) }); break; }
-        const br = para.lastIndexOf(' ', pos + COLS);
-        if (br <= pos) { out.push({ s: start + pos, t: para.slice(pos, pos + COLS) }); pos += COLS; }
-        else { out.push({ s: start + pos, t: para.slice(pos, br + 1) }); pos = br + 1; }
+      const items = paraItems(para, start);
+      const push = (a, b) => { const its = items.slice(a, b); out.push({ s: its[0].s, e: its[its.length - 1].e, items: its, rows: 1 }); };
+      if (!items.length) out.push({ s: start, e: start, items: [], rows: 1 });
+      else if (items[0].kind === 'block') out.push({ s: start, e: start + para.length, items, rows: items[0].rows, block: true });
+      else {
+        let k = 0;
+        while (k < items.length) {
+          let cols = 0, j = k, lastSpace = -1;
+          while (j < items.length && cols + items[j].cols <= COLS) {
+            cols += items[j].cols;
+            if (items[j].ch === ' ') lastSpace = j;
+            j++;
+          }
+          if (j >= items.length) { push(k, items.length); break; }
+          if (items[j].ch === ' ') { push(k, j + 1); k = j + 1; continue; }     // a space may hang at the line end
+          if (lastSpace >= k) { push(k, lastSpace + 1); k = lastSpace + 1; }
+          else { const end = Math.max(j, k + 1); push(k, end); k = end; }       // one long word: hard break
+        }
       }
       start += para.length + 1;
     }
+    let row = 0;
+    out.forEach(L => { L.row = row; row += L.rows; });
     return out;
   }
+  // note text with formulas rendered, for Board cards
+  function richSnippet(text) {
+    return text.split('\n').map(line => {
+      const bm = /^\$\$(.+)\$\$\s*$/.exec(line);
+      if (bm) return `<span class="nb">${katexHTML(bm[1], false)}</span>`;
+      return line.replace(/\\\$|\$([^$\n]+?)\$|[^$\\]+|[\s\S]/g, (m, src) => (src !== undefined && src.trim() ? katexHTML(src, false) : escStr(m)));
+    }).join('\n');
+  }
+  const tokens = () => lines.flatMap(L => L.items.filter(it => it.kind !== 'ch'));
 
   let lines = [], curLine = 0, curCol = 0, roll = 0, strikeY = 0, freshFrom = -1, freshTo = -1;
   function renderPaper() {
     lines = wrap(ta.value);
     const ss = ta.selectionStart, se = ta.selectionEnd;
+    const inSel = it => ss !== se && it.s >= ss && it.e <= se;
+    const isFresh = it => it.e > freshFrom && it.e <= freshTo;
     let html = '';
     lines.forEach((ln, li) => {
-      html += `<div class="line" data-l="${li}">`;
-      for (let k = 0; k < ln.t.length; k++) {
-        const i = ln.s + k, ch = ln.t[k];
-        let cls = (ss !== se && i >= ss && i < se) ? 'c sel' : 'c';
-        if (i >= freshFrom && i < freshTo) cls += ' fresh';
-        html += `<span class="${cls}" data-i="${i}">${ch === ' ' ? '&nbsp;' : esc(ch)}</span>`;
+      html += `<div class="line" data-l="${li}"${ln.rows > 1 ? ` style="height:${ln.rows * lh}px"` : ''}>`;
+      for (const it of ln.items) {
+        const extra = (inSel(it) ? ' sel' : '') + (isFresh(it) ? ' fresh' : '');
+        if (it.kind === 'ch') html += `<span class="c${extra}" data-i="${it.s}">${it.ch === ' ' ? '&nbsp;' : esc(it.ch)}</span>`;
+        else if (it.kind === 'math') html += `<span class="m${extra}" data-s="${it.s}" data-e="${it.e}" style="width:${it.cols * cw}px">${katexHTML(it.src, false)}</span>`;
+        else html += `<div class="mb${extra}" data-s="${it.s}" data-e="${it.e}">${katexHTML(it.src, true)}</div>`;
       }
       html += '</div>';
     });
@@ -318,8 +402,63 @@
     const p = ta.selectionEnd;
     let li = 0;
     for (let k = 0; k < lines.length; k++) { if (lines[k].s <= p) li = k; else break; }
-    return { line: li, col: Math.min(p - lines[li].s, COLS) };
+    let col = 0;
+    for (const it of lines[li].items) { if (it.e <= p) col += it.cols; else break; }
+    return { line: li, col: Math.min(col, COLS) };
   }
+
+  // the caret never rests inside a formula's source: hop over it in the direction it was moving
+  let lastCaret = 0;
+  function snapCaret() {
+    if (ta.selectionStart !== ta.selectionEnd) return;
+    const p = ta.selectionStart;
+    const t = tokens().find(it => it.s < p && p < it.e);
+    if (t) { const to = lastCaret >= t.e ? t.s : t.e; ta.setSelectionRange(to, to); lastCaret = to; }
+    else lastCaret = p;
+  }
+
+  // small editor under a formula: source + live preview; Enter saves, Esc cancels, click away saves
+  const mathEd = document.createElement('div');
+  mathEd.className = 'math-edit';
+  mathEd.innerHTML = '<textarea rows="2" spellcheck="false" aria-label="LaTeX"></textarea><div class="math-prev"></div><div class="math-hint">Enter to save · Shift+Enter new line · Esc to cancel</div>';
+  document.body.appendChild(mathEd);
+  const mathInput = mathEd.querySelector('textarea'), mathPrev = mathEd.querySelector('.math-prev');
+  let editing = null;
+  function previewMath() {
+    const src = mathInput.value;
+    mathPrev.innerHTML = src.trim() ? katexHTML(src, editing && editing.block) : '<span class="math-empty">Empty · saving removes it</span>';
+  }
+  function openMathEditor(el) {
+    const s = +el.dataset.s, e = +el.dataset.e;
+    const t = tokens().find(it => it.s === s && it.e === e);
+    if (!t) return;
+    editing = { s, e, block: t.kind === 'block' };
+    mathInput.value = t.src;
+    const r = el.getBoundingClientRect();
+    mathEd.style.left = Math.max(8, Math.min(innerWidth - 368, r.left + r.width / 2 - 180)) + 'px';
+    mathEd.style.top = Math.min(innerHeight - 180, r.bottom + 8) + 'px';
+    mathEd.classList.add('open');
+    previewMath();
+    mathInput.focus(); mathInput.select();
+  }
+  function closeMathEditor(save) {
+    if (!editing) return;
+    const { s, e, block } = editing; editing = null;
+    mathEd.classList.remove('open');
+    if (save) {
+      const src = mathInput.value.replace(/\$/g, '').trim();
+      const repl = !src ? '' : block ? '$$' + src.replace(/\n/g, ' ') + '$$' : '$' + src.replace(/\n/g, ' ') + '$';
+      ta.focus();
+      ta.setRangeText(repl, s, e, 'end');
+      ta.dispatchEvent(new InputEvent('input', { inputType: 'insertReplacementText' }));
+    } else ta.focus();
+  }
+  mathInput.addEventListener('input', previewMath);
+  mathInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); closeMathEditor(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); closeMathEditor(false); }
+  });
+  document.addEventListener('pointerdown', e => { if (editing && !mathEd.contains(e.target)) closeMathEditor(true); }, true);
 
   function layout(animate = true) {
     const W = stage.clientWidth;
@@ -332,7 +471,8 @@
 
     const x = W / 2 - (PAD_X + col * cw + cw / 2);
     carriage.style.transform = `translateX(${x}px)`;
-    const lineBottom = PAD_T + $('head').offsetHeight + (line + 1) * lh;
+    const L = lines[line] || { row: line, rows: 1 };
+    const lineBottom = PAD_T + $('head').offsetHeight + (L.row + L.rows) * lh;
     paper.style.transform = `translateY(${strikeY - lineBottom + roll * lh}px)`;
 
     // vertical "|" cursor at the left edge of the next letter's cell
@@ -382,9 +522,33 @@
     const k = e.key;
     if (k === 'Backspace' || k === 'Delete') {
       if (settings.noBackspace) { e.preventDefault(); toast('No going back. Keep typing.'); return; }
-      sfx.back(); return;
+      sfx.back();
+      // a formula is deleted as one piece
+      const p = ta.selectionStart;
+      if (p === ta.selectionEnd) {
+        const t = tokens().find(it => (k === 'Backspace' ? it.e : it.s) === p);
+        if (t) {
+          e.preventDefault();
+          ta.setRangeText('', t.s, t.e, 'end');
+          ta.dispatchEvent(new InputEvent('input', { inputType: 'deleteContentBackward' }));
+        }
+      }
+      return;
     }
-    if (k === 'Enter') { sfx.ret(); return; }
+    if (k === 'Enter') {
+      sfx.ret();
+      // "$$ x^2" + Enter closes the block equation for you
+      const v = ta.value, p = ta.selectionStart;
+      const ps = v.lastIndexOf('\n', p - 1) + 1, pe = v.indexOf('\n', p) < 0 ? v.length : v.indexOf('\n', p);
+      const para = v.slice(ps, pe);
+      if (p === pe && p === ta.selectionEnd && /^\$\$./.test(para) && !/^\$\$(.+)\$\$\s*$/.test(para)) {
+        e.preventDefault();
+        ta.setRangeText('$$\n', p, p, 'end');
+        freshFrom = p; freshTo = p + 2;
+        ta.dispatchEvent(new InputEvent('input', { inputType: 'insertLineBreak' }));
+      }
+      return;
+    }
     if (k.length !== 1) return;
     k === ' ' ? sfx.space() : sfx.key();
     typing();
@@ -394,7 +558,8 @@
     roll = 0;
     // newly typed letters show up only after the page has moved
     if (e.inputType === 'insertText' && e.data) { freshTo = ta.selectionStart; freshFrom = freshTo - e.data.length; }
-    else freshFrom = freshTo = -1;
+    else if (e.inputType !== 'insertLineBreak') freshFrom = freshTo = -1;
+    lastCaret = ta.selectionStart;
     renderPaper();
     freshFrom = freshTo = -1;
     const before = curLine;
@@ -406,6 +571,7 @@
   let hadSel = false;
   document.addEventListener('selectionchange', () => {
     if (document.activeElement !== ta) return;
+    snapCaret();
     const sel = ta.selectionStart !== ta.selectionEnd;
     if (sel || hadSel) renderPaper();
     hadSel = sel;
@@ -445,9 +611,15 @@
     if (Math.hypot(d.lx - d.x, d.ly - d.y) >= 6) d.moved = true;
     tearEl.classList.remove('show', 'ready');
     if (!d.moved) {
+      const m = d.target.closest && d.target.closest('.m, .mb');
+      if (m) { openMathEditor(m); return; }
       const c = d.target.closest && d.target.closest('.c'), ln = d.target.closest && d.target.closest('.line');
       if (c) ta.setSelectionRange(+c.dataset.i, +c.dataset.i);
-      else if (ln) { const L = lines[+ln.dataset.l]; const end = L.s + L.t.replace(/ $/, '').length; ta.setSelectionRange(end, end); }
+      else if (ln) {
+        const L = lines[+ln.dataset.l], last = L.items[L.items.length - 1];
+        const end = last && last.ch === ' ' ? last.s : L.e;
+        ta.setSelectionRange(end, end);
+      }
       roll = 0; layout(); ta.focus();
       return;
     }
@@ -678,7 +850,7 @@
       d.querySelector('.nt').textContent = title || 'Untitled';
       d.querySelector('.nt').classList.toggle('ph', !title);
       d.querySelector('.nd').textContent = fmtShort(e.created);
-      d.querySelector('.ns').textContent = body.slice(0, 200);
+      d.querySelector('.ns').innerHTML = richSnippet(body.slice(0, 200));
       world.appendChild(d);
     });
     drawEdges(); applyView();
