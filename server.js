@@ -10,7 +10,7 @@ const ROOT = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '127.0.0.1';
 const DATA_DIR = process.env.DATA_DIR || join(ROOT, 'data');
-const MAX_BODY = 20 * 1024 * 1024;
+const MAX_BODY = 5 * 1024 * 1024; // same cap as the cloud save_journal function
 
 await mkdir(DATA_DIR, { recursive: true });
 const db = new DatabaseSync(join(DATA_DIR, 'journal.db'));
@@ -64,8 +64,32 @@ function writeState(s) {
 }
 
 const send = (res, code, body, type = 'application/json') => {
-  res.writeHead(code, { 'Content-Type': type, 'Cache-Control': 'no-store' });
+  res.writeHead(code, {
+    'Content-Type': type,
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
+  });
   res.end(type === 'application/json' ? JSON.stringify(body) : body);
+};
+
+// Only answer to our own host names. Blocks DNS-rebinding, where a hostile site
+// points its own domain at 127.0.0.1 to read the API from the victim's browser.
+const ALLOWED_HOSTS = new Set([
+  `localhost:${PORT}`, `127.0.0.1:${PORT}`, `[::1]:${PORT}`,
+  ...(process.env.ALLOWED_HOSTS || '').split(',').map(h => h.trim().toLowerCase()).filter(Boolean),
+]);
+const hostOk = req => ALLOWED_HOSTS.has(String(req.headers.host || '').toLowerCase());
+// Writes must come from our own page: same-origin JSON only.
+// A cross-site form or text/plain "simple request" gets refused before the body is read.
+const writeOk = req => {
+  const origin = req.headers.origin;
+  if (origin !== undefined) {
+    try { if (!ALLOWED_HOSTS.has(new URL(origin).host.toLowerCase())) return false; } catch { return false; }
+  }
+  if (req.headers['sec-fetch-site'] && !['same-origin', 'none'].includes(req.headers['sec-fetch-site'])) return false;
+  return /^application\/json\b/i.test(String(req.headers['content-type'] || ''));
 };
 
 function readBody(req) {
@@ -80,13 +104,16 @@ function readBody(req) {
 createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   try {
+    if (!hostOk(req)) return send(res, 421, { error: 'unknown host' });
+
     if (url.pathname === '/api/state' && req.method === 'GET') return send(res, 200, readState());
 
-    if (url.pathname === '/api/state' && (req.method === 'PUT' || req.method === 'POST')) {
+    if (url.pathname === '/api/state' && req.method === 'PUT') {
+      if (!writeOk(req)) return send(res, 403, { error: 'cross-site write refused' });
       const s = JSON.parse(await readBody(req));
       const current = getKv('rev') ?? 0;
-      // optimistic lock: refuse writes based on an old copy (e.g. a second tab)
-      if (!s.force && s.baseRev !== current) return send(res, 409, { error: 'stale', rev: current });
+      // optimistic lock: refuse writes based on an old copy (e.g. a second tab). There is no override.
+      if (s.baseRev !== current) return send(res, 409, { error: 'stale', rev: current });
       return send(res, 200, { rev: writeState(s) });
     }
 
@@ -95,8 +122,8 @@ createServer(async (req, res) => {
     if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
       return send(res, 200, await readFile(join(ROOT, 'index.html')), 'text/html; charset=utf-8');
     }
-    if (req.method === 'GET' && url.pathname === '/config.js') {
-      return send(res, 200, await readFile(join(ROOT, 'config.js')), 'text/javascript; charset=utf-8');
+    if (req.method === 'GET' && (url.pathname === '/config.js' || url.pathname === '/app.js')) {
+      return send(res, 200, await readFile(join(ROOT, url.pathname.slice(1))), 'text/javascript; charset=utf-8');
     }
     send(res, 404, { error: 'not found' });
   } catch (err) {
